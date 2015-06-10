@@ -1,0 +1,20 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Fire Emblem Awakening Save Tool", "Fire Emblem Awakening Save Tool\Fire Emblem Awakening Save Tool.csproj", "{7AF5F43A-9901-42D9-A2AB-8D155A6B0D1B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x86 = Debug|x86
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7AF5F43A-9901-42D9-A2AB-8D155A6B0D1B}.Debug|x86.ActiveCfg = Release|x86
+		{7AF5F43A-9901-42D9-A2AB-8D155A6B0D1B}.Debug|x86.Build.0 = Release|x86
+		{7AF5F43A-9901-42D9-A2AB-8D155A6B0D1B}.Release|x86.ActiveCfg = Release|x86
+		{7AF5F43A-9901-42D9-A2AB-8D155A6B0D1B}.Release|x86.Build.0 = Release|x86
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
