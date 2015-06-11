@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace Fire_Emblem_Awakening_Save_Tool
 {
-    public unsafe class Huffman8
+    public class Huffman8
     {
         const byte CMD_CODE = 0x28; // 8-bit Huffman magic number
         const uint HUF_LNODE = 0;
@@ -52,150 +52,123 @@ namespace Fire_Emblem_Awakening_Save_Tool
 
         public byte[] Decompress(byte[] data)
         {
-            uint pak_len = (uint)data.Length;
+            uint header = BitConverter.ToUInt32(data, 0);
+            num_bits = (int)header & 0xF;
+            uint UncompressedLength = header >> 8;
+            byte[] Uncompressed = new byte[UncompressedLength];
+            uint pak_pos = 4;
+            pak_pos += (uint)(data[pak_pos] + 1) << 1;
+            uint raw_pos = 0;
+            uint tree = 4;
+            int nbits = 0;
+            uint pos = data[tree + 1];
+            uint next = 0, mask4 = 0;
+            uint code = BitConverter.ToUInt32(data, (int)pak_pos);
 
-            fixed (byte* pak_buffer = &data[0])
+            while (raw_pos < Uncompressed.Length)
             {
-                uint header = *pak_buffer;
-                num_bits = (int)(header & 0xF);
-                uint raw_len = *(uint*)pak_buffer >> 8;
-                byte[] raw_data = new byte[raw_len];
-                fixed (byte* raw_buffer = &raw_data[0])
+                if ((mask4 >>= HUF_SHIFT) == 0)
                 {
-                    byte* pak = pak_buffer + 4;
-                    byte* raw = raw_buffer;
-                    byte* pak_end = pak_buffer + pak_len;
-                    byte* raw_end = raw_buffer + raw_len;
+                    if (pak_pos + 3 >= data.Length) break;
+                    code = BitConverter.ToUInt32(data, (int)pak_pos);
+                    pak_pos += 4;
+                    mask4 = HUF_MASK4;
+                }
 
-                    byte* tree = pak;
-                    pak += (*pak + 1) << 1;
+                next += ((pos & HUF_NEXT) + 1) << 1;
 
-                    int nbits = 0;
+                uint ch;
+                if ((code & mask4) == 0)
+                {
+                    ch = pos & HUF_LCHAR;
+                    pos = data[tree + next];
+                }
+                else
+                {
+                    ch = pos & HUF_RCHAR;
+                    pos = data[tree + next + 1];
+                }
 
-                    uint pos = *(tree + 1);
-                    uint next = 0;
+                if (ch != 0)
+                {
+                    Uncompressed[raw_pos] |= (byte)(pos << nbits);
+                    ////  *raw = (*raw << num_bits) | pos; 
+                    nbits = (nbits + num_bits) & 7;
+                    if (nbits == 0) raw_pos++;
 
-                    uint mask4 = 0;
-
-                    uint code = *(uint*)pak;
-
-                    while (raw < raw_end)
-                    {
-                        if ((mask4 >>= HUF_SHIFT) == 0)
-                        {
-                            if (pak + 3 >= pak_end) break;
-                            code = *(uint*)pak;
-                            pak += 4;
-                            mask4 = HUF_MASK4;
-                        }
-
-                        next += ((pos & HUF_NEXT) + 1) << 1;
-
-                        uint ch;
-                        if ((code & mask4) == 0)
-                        {
-                            ch = pos & HUF_LCHAR;
-                            pos = *(tree + next);
-                        }
-                        else
-                        {
-                            ch = pos & HUF_RCHAR;
-                            pos = *(tree + next + 1);
-                        }
-
-                        if (ch != 0)
-                        {
-                            *raw |= (byte)(pos << nbits);
-                            ////  *raw = (*raw << num_bits) | pos; 
-                            nbits = (nbits + num_bits) & 7;
-                            if (nbits == 0) raw++;
-
-                            pos = *(tree + 1);
-                            next = 0;
-                        }
-                    }
-
-                    // raw_len = (uint)(raw - raw_buffer);
-                    return raw_data;
+                    pos = data[tree+1];
+                    next = 0;
                 }
             }
+
+            return Uncompressed;
         }
+
         public byte[] Compress(byte[] data)
         {
-            // byte* pak_end;
-            // uint new_len;
-            uint* pk4 = stackalloc uint[1];
-
+            uint pk4_pos = 0;
             num_bits = 8;
             uint raw_len = (uint)data.Length;
 
-            fixed (byte* raw_buffer = &data[0])
+            byte[] pbuf = new byte[HUF_MAXIM + 1];
+            Array.Copy(BitConverter.GetBytes((CMD_CODE) | (raw_len << 8)), pbuf, 4);
+            uint pak_pos = 4;
+            uint raw_pos = 0;
+            HUF_InitFreqs();
+            HUF_CreateFreqs(data, data.Length);
+
+            HUF_InitTree();
+            HUF_CreateTree();
+
+            HUF_InitCodeTree();
+            HUF_CreateCodeTree();
+
+            HUF_InitCodeWorks();
+            HUF_CreateCodeWorks();
+
+            uint cod_pos = 0;
+
+            uint len = (uint)((codetree[cod_pos] + 1) << 1);
+            while (len-- != 0) pbuf[pak_pos++] = codetree[cod_pos++];
+            uint mask4 = 0;
+            while (raw_pos < data.Length)
             {
-                byte[] pbuf = new byte[HUF_MAXIM + 1];
-                fixed (byte* pak_buffer = &pbuf[0])
+                uint ch = data[raw_pos++];
+
+
+                int nbits;
+                for (nbits = 8; nbits != 0; nbits -= num_bits)
                 {
-                    *(uint*)pak_buffer = (CMD_CODE) | (raw_len << 8);
-                    byte* pak = pak_buffer + 4;
-                    byte* raw = raw_buffer;
-                    byte* raw_end = raw_buffer + raw_len;
-                    HUF_InitFreqs();
-                    HUF_CreateFreqs(raw_buffer, (int)raw_len);
+                    HuffmanCode code = codes[ch & ((1 << num_bits) - 1)];
+                    ////  code = codes[ch >> (8 - num_bits)];
 
-                    HUF_InitTree();
-                    HUF_CreateTree();
+                    len = code.nbits;
+                    int cwork = 0;
 
-                    HUF_InitCodeTree();
-                    HUF_CreateCodeTree();
-
-                    HUF_InitCodeWorks();
-                    HUF_CreateCodeWorks();
-
-                    fixed (byte* cd = &codetree[0])
+                    byte mask = (byte)HUF_MASK;
+                    while (len-- != 0)
                     {
-                        byte* cod = cd;
-                        uint len = (uint)((*cod + 1) << 1);
-                        while (len-- != 0) *pak++ = *cod++;
-                        uint mask4 = 0;
-                        while (raw < raw_end)
+                        if ((mask4 >>= HUF_SHIFT) == 0)
                         {
-                            uint ch = *raw++;
-
-
-                            int nbits;
-                            for (nbits = 8; nbits != 0; nbits -= num_bits)
-                            {
-                                HuffmanCode code = codes[ch & ((1 << num_bits) - 1)];
-                                ////  code = codes[ch >> (8 - num_bits)];
-
-                                len = code.nbits;
-                                int cwork = 0;
-
-                                byte mask = (byte)HUF_MASK;
-                                while (len-- != 0)
-                                {
-                                    if ((mask4 >>= HUF_SHIFT) == 0)
-                                    {
-                                        mask4 = HUF_MASK4;
-                                        *(pk4 = (uint*)pak) = 0;
-                                        pak += 4;
-                                    }
-                                    if ((code.codework[cwork] & mask) != 0) *pk4 |= mask4;
-                                    if ((mask >>= HUF_SHIFT) == 0)
-                                    {
-                                        mask = (byte)HUF_MASK;
-                                        cwork++;
-                                    }
-                                }
-
-                                ch >>= num_bits;
-                                ////  ch = (ch << num_bits) & 0xFF;
-                            }
+                            mask4 = HUF_MASK4;
+                            pk4_pos = pak_pos;
+                            Array.Copy(BitConverter.GetBytes(0), 0, pbuf, pk4_pos, 4);
+                            pak_pos += 4;
                         }
-                        uint pak_len = (uint)(pak - pak_buffer);
-                        return pbuf.Take((int)pak_len).ToArray();
+                        if ((code.codework[cwork] & mask) != 0) Array.Copy(BitConverter.GetBytes(BitConverter.ToUInt32(pbuf, (int)pk4_pos) | mask4), 0, pbuf, pk4_pos, 4);
+                        if ((mask >>= HUF_SHIFT) == 0)
+                        {
+                            mask = (byte)HUF_MASK;
+                            cwork++;
+                        }
                     }
+
+                    ch >>= num_bits;
+                    ////  ch = (ch << num_bits) & 0xFF;
                 }
             }
+            uint pak_len = (uint)(pak_pos);
+            return pbuf.Take((int)pak_len).ToArray();
         }
 
         private void HUF_InitFreqs()
@@ -206,13 +179,13 @@ namespace Fire_Emblem_Awakening_Save_Tool
 
             for (i = 0; i < max_symbols; i++) freqs[i] = 0;
         }
-        private void HUF_CreateFreqs(byte* raw_buffer, int raw_len)
+        private void HUF_CreateFreqs(byte[] raw_buffer, int raw_len)
         {
             uint i;
 
             for (i = 0; i < raw_len; i++)
             {
-                uint ch = *raw_buffer++;
+                uint ch = raw_buffer[i];
                 int nbits;
                 for (nbits = 8; nbits != 0; nbits -= num_bits)
                 {
@@ -389,13 +362,13 @@ namespace Fire_Emblem_Awakening_Save_Tool
                 if (root.lson.leafs <= root.rson.leafs)
                 {
                     uint l_leafs = HUF_CreateCodeBranch(root.lson, q, q + 2);
-                    // r_leafs = HUF_CreateCodeBranch(root.rson, q + 1, q + (l_leafs << 1));
+                    uint r_leafs = HUF_CreateCodeBranch(root.rson, q + 1, q + (l_leafs << 1));
                     codetree[q + 1] = (byte)(l_leafs - 1);
                 }
                 else
                 {
                     uint r_leafs = HUF_CreateCodeBranch(root.rson, q + 1, q + 2);
-                    // l_leafs = HUF_CreateCodeBranch(root.lson, q, q + (r_leafs << 1));
+                    uint l_leafs = HUF_CreateCodeBranch(root.lson, q, q + (r_leafs << 1));
                     codetree[q] = (byte)(r_leafs - 1);
                 }
             }

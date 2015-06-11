@@ -51,7 +51,7 @@ namespace Fire_Emblem_Awakening_Save_Tool
             TB_Path.Text = RootDirectory = string.Empty;
             SetSavable(false);
             RootDirectory = path + Path.DirectorySeparatorChar;
-            if (!File.Exists(RootDirectory + FileNames[0]) && !File.Exists(RootDirectory+FileNames[0]+DecMarker))
+            if (!File.Exists(RootDirectory + FileNames[0]) && !File.Exists(RootDirectory + FileNames[0] + DecMarker))
             {
                 MessageBox.Show("Folder contains no Global, aborting.");
                 RootDirectory = string.Empty;
@@ -66,7 +66,6 @@ namespace Fire_Emblem_Awakening_Save_Tool
             {
                 Global = File.ReadAllBytes(RootDirectory + FileNames[0]);
                 Global_Dec = Decompress(Global.Skip(0x10).ToArray());
-
                 for (int i = 0; i < 3; i++)
                 {
                     if (HasFiles[1 + i])
@@ -92,14 +91,14 @@ namespace Fire_Emblem_Awakening_Save_Tool
                 {
                     if (HasFiles[1 + i])
                     {
-                        Chapters[i] = File.ReadAllBytes(RootDirectory + FileNames[1 + i] + DecMarker);
+                        Chapters_Dec[i] = File.ReadAllBytes(RootDirectory + FileNames[1 + i] + DecMarker);
                     }
                 }
                 for (int i = 0; i < 2; i++)
                 {
                     if (HasFiles[4 + i])
                     {
-                        Maps[i] = File.ReadAllBytes(RootDirectory + FileNames[4 + i] + DecMarker);
+                        Maps_Dec[i] = File.ReadAllBytes(RootDirectory + FileNames[4 + i] + DecMarker);
                     }
                 }
                 UpdateCompressed(); // Compress all files
@@ -230,7 +229,6 @@ namespace Fire_Emblem_Awakening_Save_Tool
 
         private void UpdateCompressed()
         {
-            Compress(Global_Dec);
             Global = GetHeader(Global_Dec, (uint)Global_Dec.Length).Concat(Compress(Global_Dec)).ToArray();
             for (int i = 0; i < 3; i++)
             {
