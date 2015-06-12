@@ -59,9 +59,9 @@ namespace Fire_Emblem_Awakening_Save_Tool
             uint pak_pos = 4;
             pak_pos += (uint)(data[pak_pos] + 1) << 1;
             uint raw_pos = 0;
-            uint tree = 4;
+            const uint tree_ofs = 4;
             int nbits = 0;
-            uint pos = data[tree + 1];
+            uint pos = data[tree_ofs + 1];
             uint next = 0, mask4 = 0;
             uint code = BitConverter.ToUInt32(data, (int)pak_pos);
 
@@ -81,12 +81,12 @@ namespace Fire_Emblem_Awakening_Save_Tool
                 if ((code & mask4) == 0)
                 {
                     ch = pos & HUF_LCHAR;
-                    pos = data[tree + next];
+                    pos = data[tree_ofs + next];
                 }
                 else
                 {
                     ch = pos & HUF_RCHAR;
-                    pos = data[tree + next + 1];
+                    pos = data[tree_ofs + next + 1];
                 }
 
                 if (ch != 0)
@@ -96,7 +96,7 @@ namespace Fire_Emblem_Awakening_Save_Tool
                     nbits = (nbits + num_bits) & 7;
                     if (nbits == 0) raw_pos++;
 
-                    pos = data[tree+1];
+                    pos = data[tree_ofs+1];
                     next = 0;
                 }
             }
@@ -167,7 +167,7 @@ namespace Fire_Emblem_Awakening_Save_Tool
                     ////  ch = (ch << num_bits) & 0xFF;
                 }
             }
-            uint pak_len = (uint)(pak_pos);
+            uint pak_len = pak_pos;
             return pbuf.Take((int)pak_len).ToArray();
         }
 
